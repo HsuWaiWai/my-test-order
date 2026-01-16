@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="my">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -30,12 +30,10 @@
       font-weight:600;
       color:#555;
       border-right:1px solid #eee;
+      user-select:none;
     }
     .tab:last-child{ border-right:none; }
-    .tab.active{
-      background:#0b57d0;
-      color:#fff;
-    }
+    .tab.active{ background:#0b57d0; color:#fff; }
 
     .card{
       background:#fff;
@@ -44,11 +42,13 @@
       padding:18px;
       box-shadow:0 1px 0 rgba(0,0,0,0.03);
     }
+    h2{ margin:0 0 10px; font-size:20px; }
 
     table{ width:100%; border-collapse:collapse; }
     th,td{ padding:12px 10px; border-bottom:1px solid #f0f0f6; }
-    th{ text-align:left; font-size:13px; color:#444; }
-    .price{ text-align:right; font-weight:700; }
+    th{ text-align:left; font-size:13px; color:#444; background:#fafafe; }
+    .price{ text-align:right; font-weight:700; white-space:nowrap; }
+    .muted{ color:#666; font-size:12px; }
 
     label{ display:block; font-size:12px; color:#444; margin:12px 0 6px; }
     select,input{
@@ -57,6 +57,8 @@
       border-radius:10px;
       border:1px solid #d9d9e6;
       font-size:16px;
+      background:#fff;
+      outline:none;
     }
 
     .row{ display:grid; grid-template-columns:1fr 160px; gap:12px; }
@@ -69,19 +71,19 @@
       border:1px solid #ececf5;
       background:#fafafe;
     }
-    .line{ display:flex; justify-content:space-between; margin-bottom:6px; }
-    .big{ font-size:22px; font-weight:800; }
+    .line{ display:flex; justify-content:space-between; margin-bottom:6px; gap:12px; }
+    .big{ font-size:22px; font-weight:800; white-space:nowrap; }
 
+    .btnRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
     button{
-      margin-top:12px;
       padding:10px 14px;
       border-radius:10px;
-      border:none;
-      background:#0b57d0;
-      color:#fff;
+      border:1px solid #d9d9e6;
+      background:#fff;
       font-size:14px;
       cursor:pointer;
     }
+    button.primary{ border-color:#0b57d0; background:#0b57d0; color:#fff; }
 
     .hidden{ display:none; }
   </style>
@@ -99,24 +101,17 @@
   <!-- MENU TAB -->
   <div id="menu" class="card">
     <h2>Item Price List (SGD)</h2>
-    <table>
+    <div class="muted">Flavour variants included: အချို / အစပ် / မာလာ</div>
+
+    <table aria-label="Item price list">
       <thead>
-        <tr><th>Item</th><th class="price">Price</th></tr>
+        <tr>
+          <th>Item</th>
+          <th>Flavour</th>
+          <th class="price">Price</th>
+        </tr>
       </thead>
-      <tbody>
-        <tr><td>ဆိတ်သုခ</td><td class="price">9.00</td></tr>
-        <tr><td>ဆိတ်ပြားကြွပ်ကြော်</td><td class="price">8.00</td></tr>
-        <tr><td>ဆိတ်စပ်စလူး</td><td class="price">8.00</td></tr>
-        <tr><td>ဆိတ်မွှကြော်</td><td class="price">8.00</td></tr>
-        <tr><td>ဆိတ်ချောင်းကြော်</td><td class="price">7.50</td></tr>
-        <tr><td>ဆိတ်မာလာမွှေး</td><td class="price">5.00</td></tr>
-        <tr><td>ဆိတ်သားခြောက်ဖုတ်</td><td class="price">7.00</td></tr>
-        <tr><td>ဂျူးပဲပုပ်ကြော်</td><td class="price">4.00</td></tr>
-        <tr><td>ငရုတ်သီးနှမ်းကပ်ကြော်</td><td class="price">4.00</td></tr>
-        <tr><td>မှိုနှမ်းကပ်ကြော်</td><td class="price">4.00</td></tr>
-        <tr><td>မှိုဆီကြော်</td><td class="price">6.00</td></tr>
-        <tr><td>ကြက်စပ်မာလာ</td><td class="price">5.00</td></tr>
-      </tbody>
+      <tbody id="menuBody"></tbody>
     </table>
   </div>
 
@@ -126,22 +121,25 @@
 
     <div class="row">
       <div>
-        <label>Item</label>
+        <label for="item">Item (with flavour)</label>
         <select id="item"></select>
       </div>
       <div>
-        <label>Quantity</label>
+        <label for="qty">Quantity</label>
         <input id="qty" type="number" min="1" value="1"/>
       </div>
     </div>
 
-    <div class="summary">
-      <div class="line"><span>Unit Price</span><span id="unitPrice">SGD 0.00</span></div>
-      <div class="line"><span>Quantity</span><span id="qtyOut">1</span></div>
+    <div class="summary" aria-live="polite">
+      <div class="line"><span class="muted">Unit Price</span><span id="unitPrice" class="muted">SGD 0.00</span></div>
+      <div class="line"><span class="muted">Quantity</span><span id="qtyOut" class="muted">1</span></div>
       <div class="line"><strong>Total</strong><strong class="big" id="total">SGD 0.00</strong></div>
     </div>
 
-    <button onclick="addItem()">Add to Order</button>
+    <div class="btnRow">
+      <button class="primary" type="button" onclick="addItem()">Add to Order</button>
+      <button type="button" onclick="resetOrder()">Reset</button>
+    </div>
 
     <div id="orderList" style="margin-top:12px;"></div>
   </div>
@@ -149,82 +147,133 @@
 </div>
 
 <script>
+  // Full item list (including flavour variants)
   const ITEMS = [
-    { name: "ဆိတ်သုခ", price: 9 },
-    { name: "ဆိတ်ပြားကြွပ်ကြော်", price: 8 },
-    { name: "ဆိတ်စပ်စလူး", price: 8 },
-    { name: "ဆိတ်မွှကြော်", price: 8 },
-    { name: "ဆိတ်ချောင်းကြော်", price: 7.5 },
-    { name: "ဆိတ်မာလာမွှေး", price: 5 },
-    { name: "ဆိတ်သားခြောက်ဖုတ်", price: 7 },
-    { name: "ဂျူးပဲပုပ်ကြော်", price: 4 },
-    { name: "ငရုတ်သီးနှမ်းကပ်ကြော်", price: 4 },
-    { name: "မှိုနှမ်းကပ်ကြော်", price: 4 },
-    { name: "မှိုဆီကြော်", price: 6 },
-    { name: "ကြက်စပ်မာလာ", price: 5 }
+    { name: "ဆိတ်သုခ", flavour: "အချို", price: 9.0 },
+    { name: "ဆိတ်သုခ", flavour: "အစပ်", price: 9.0 },
+
+    { name: "ဆိတ်ပြားကြွပ်ကြော်", flavour: "အချို", price: 8.0 },
+    { name: "ဆတ်ပြားကြွပ်ကြော်", flavour: "အစပ်", price: 8.0 },
+
+    { name: "ဆိတ်စပ်စလူး", flavour: "အချို", price: 8.0 },
+    { name: "ဆိတ်စပ်စလူး", flavour: "အစပ်", price: 8.0 },
+
+    { name: "ဆိတ်မွှကြော်", flavour: "အချို", price: 8.0 },
+    { name: "ဆိတ်မွှကြော်", flavour: "အစပ်", price: 8.0 },
+
+    { name: "ဆိတ်ချောင်းကြော်", flavour: "အချို", price: 7.5 },
+    { name: "ဆိတ်ချောင်းကြော်", flavour: "အစပ်", price: 7.5 },
+    { name: "ဆိတ်ချောင်းကြော်", flavour: "မာလာ", price: 7.5 },
+
+    { name: "ဆိတ်မာလာမွှေး", flavour: "-", price: 5.0 },
+    { name: "ဆိတ်သားခြောက်ဖုတ်", flavour: "-", price: 7.0 },
+    { name: "ဂျူးပဲပုပ်ကြော်", flavour: "-", price: 4.0 },
+    { name: "ငရုတ်သီးနှမ်းကပ်ကြော်", flavour: "-", price: 4.0 },
+    { name: "မှိုနှမ်းကပ်ကြော်", flavour: "-", price: 4.0 },
+    { name: "မှိုဆီကြော်", flavour: "-", price: 6.0 },
+    { name: "ကြက်စပ်မာလာ", flavour: "-", price: 5.0 },
   ];
 
+  const menuBody = document.getElementById("menuBody");
   const itemSelect = document.getElementById("item");
   const qtyInput = document.getElementById("qty");
-  const unitPrice = document.getElementById("unitPrice");
-  const qtyOut = document.getElementById("qtyOut");
+  const unitPriceEl = document.getElementById("unitPrice");
+  const qtyOutEl = document.getElementById("qtyOut");
   const totalEl = document.getElementById("total");
-  const orderList = document.getElementById("orderList");
+  const orderListEl = document.getElementById("orderList");
 
   const orderLines = [];
+  const fmt = (n) => "SGD " + Number(n).toFixed(2);
 
-  function fmt(n){ return "SGD " + n.toFixed(2); }
+  function itemLabel(it){
+    const f = (it.flavour && it.flavour !== "-") ? ` (${it.flavour})` : "";
+    return `${it.name}${f}`;
+  }
 
-  ITEMS.forEach((it, i) => {
-    const opt = document.createElement("option");
-    opt.value = i;
-    opt.textContent = it.name + " — " + fmt(it.price);
-    itemSelect.appendChild(opt);
-  });
+  // Render menu table
+  function renderMenu(){
+    menuBody.innerHTML = "";
+    ITEMS.forEach(it => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${it.name}</td>
+        <td>${it.flavour || "-"}</td>
+        <td class="price">${fmt(it.price)}</td>
+      `;
+      menuBody.appendChild(tr);
+    });
+  }
+
+  // Fill dropdown
+  function fillDropdown(){
+    itemSelect.innerHTML = "";
+    ITEMS.forEach((it, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${itemLabel(it)} — ${fmt(it.price)}`;
+      itemSelect.appendChild(opt);
+    });
+  }
+
+  function clampQty(v){
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 1) return 1;
+    return Math.floor(n);
+  }
 
   function recalc(){
-    const idx = itemSelect.value;
-    const q = Math.max(1, parseInt(qtyInput.value || 1));
-    const p = ITEMS[idx].price;
+    const idx = Number(itemSelect.value || 0);
+    const it = ITEMS[idx] || { price: 0 };
+    const q = clampQty(qtyInput.value);
 
     qtyInput.value = q;
-    unitPrice.textContent = fmt(p);
-    qtyOut.textContent = q;
-    totalEl.textContent = fmt(p * q);
+    qtyOutEl.textContent = String(q);
+    unitPriceEl.textContent = fmt(it.price);
+    totalEl.textContent = fmt(it.price * q);
   }
 
   function addItem(){
-    const idx = itemSelect.value;
-    const q = Math.max(1, parseInt(qtyInput.value || 1));
-    const item = ITEMS[idx];
+    const idx = Number(itemSelect.value || 0);
+    const it = ITEMS[idx];
+    const q = clampQty(qtyInput.value);
+    const total = it.price * q;
 
-    orderLines.push({ name: item.name, qty: q, total: item.price * q });
+    orderLines.push({ label: itemLabel(it), qty: q, total });
     renderOrder();
   }
 
   function renderOrder(){
-    if(orderLines.length === 0){
-      orderList.innerHTML = "<em>No items added.</em>";
+    if (orderLines.length === 0) {
+      orderListEl.innerHTML = "<em>No items added.</em>";
       return;
     }
-    let html = "<strong>Order List:</strong><ul>";
     let sum = 0;
-    orderLines.forEach(l=>{
+    let html = "<strong>Order List:</strong><ul style='margin:8px 0 0; padding-left:18px;'>";
+    orderLines.forEach(l => {
       sum += l.total;
-      html += `<li>${l.name} × ${l.qty} = ${fmt(l.total)}</li>`;
+      html += `<li>${l.label} × ${l.qty} = ${fmt(l.total)}</li>`;
     });
-    html += `</ul><strong>Grand Total: ${fmt(sum)}</strong>`;
-    orderList.innerHTML = html;
+    html += `</ul><div style="margin-top:8px;"><strong>Grand Total: ${fmt(sum)}</strong></div>`;
+    orderListEl.innerHTML = html;
+  }
+
+  function resetOrder(){
+    orderLines.length = 0;
+    qtyInput.value = 1;
+    itemSelect.value = "0";
+    recalc();
+    renderOrder();
   }
 
   function showTab(tab){
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    document.querySelectorAll('.card').forEach(c=>c.classList.add('hidden'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('menu').classList.add('hidden');
+    document.getElementById('order').classList.add('hidden');
 
-    if(tab === 'menu'){
+    if (tab === 'menu') {
       document.getElementById('menu').classList.remove('hidden');
       document.querySelectorAll('.tab')[0].classList.add('active');
-    }else{
+    } else {
       document.getElementById('order').classList.remove('hidden');
       document.querySelectorAll('.tab')[1].classList.add('active');
     }
@@ -233,8 +282,10 @@
   itemSelect.addEventListener("change", recalc);
   qtyInput.addEventListener("input", recalc);
 
-  recalc();
-  renderOrder();
+  // init
+  renderMenu();
+  fillDropdown();
+  resetOrder();
 </script>
 </body>
 </html>
