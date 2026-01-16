@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Menu & Order</title>
+
+  <style>
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:#f6f7fb;
+      color:#111;
+    }
+    .wrap{ max-width:900px; margin:28px auto; padding:0 16px; }
+
+    .tabs{
+      display:flex;
+      background:#fff;
+      border:1px solid #e7e7ee;
+      border-radius:12px;
+      overflow:hidden;
+      margin-bottom:14px;
+    }
+    .tab{
+      flex:1;
+      padding:12px;
+      text-align:center;
+      cursor:pointer;
+      font-weight:600;
+      color:#555;
+      border-right:1px solid #eee;
+    }
+    .tab:last-child{ border-right:none; }
+    .tab.active{
+      background:#0b57d0;
+      color:#fff;
+    }
+
+    .card{
+      background:#fff;
+      border:1px solid #e7e7ee;
+      border-radius:14px;
+      padding:18px;
+      box-shadow:0 1px 0 rgba(0,0,0,0.03);
+    }
+
+    table{ width:100%; border-collapse:collapse; }
+    th,td{ padding:12px 10px; border-bottom:1px solid #f0f0f6; }
+    th{ text-align:left; font-size:13px; color:#444; }
+    .price{ text-align:right; font-weight:700; }
+
+    label{ display:block; font-size:12px; color:#444; margin:12px 0 6px; }
+    select,input{
+      width:100%;
+      padding:12px;
+      border-radius:10px;
+      border:1px solid #d9d9e6;
+      font-size:16px;
+    }
+
+    .row{ display:grid; grid-template-columns:1fr 160px; gap:12px; }
+    @media(max-width:520px){ .row{ grid-template-columns:1fr; } }
+
+    .summary{
+      margin-top:16px;
+      padding:14px;
+      border-radius:12px;
+      border:1px solid #ececf5;
+      background:#fafafe;
+    }
+    .line{ display:flex; justify-content:space-between; margin-bottom:6px; }
+    .big{ font-size:22px; font-weight:800; }
+
+    button{
+      margin-top:12px;
+      padding:10px 14px;
+      border-radius:10px;
+      border:none;
+      background:#0b57d0;
+      color:#fff;
+      font-size:14px;
+      cursor:pointer;
+    }
+
+    .hidden{ display:none; }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('menu')">📋 Menu</div>
+    <div class="tab" onclick="showTab('order')">🧮 Order Calculator</div>
+  </div>
+
+  <!-- MENU TAB -->
+  <div id="menu" class="card">
+    <h2>Item Price List (SGD)</h2>
+    <table>
+      <thead>
+        <tr><th>Item</th><th class="price">Price</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>ဆိတ်သုခ</td><td class="price">9.00</td></tr>
+        <tr><td>ဆိတ်ပြားကြွပ်ကြော်</td><td class="price">8.00</td></tr>
+        <tr><td>ဆိတ်စပ်စလူး</td><td class="price">8.00</td></tr>
+        <tr><td>ဆိတ်မွှကြော်</td><td class="price">8.00</td></tr>
+        <tr><td>ဆိတ်ချောင်းကြော်</td><td class="price">7.50</td></tr>
+        <tr><td>ဆိတ်မာလာမွှေး</td><td class="price">5.00</td></tr>
+        <tr><td>ဆိတ်သားခြောက်ဖုတ်</td><td class="price">7.00</td></tr>
+        <tr><td>ဂျူးပဲပုပ်ကြော်</td><td class="price">4.00</td></tr>
+        <tr><td>ငရုတ်သီးနှမ်းကပ်ကြော်</td><td class="price">4.00</td></tr>
+        <tr><td>မှိုနှမ်းကပ်ကြော်</td><td class="price">4.00</td></tr>
+        <tr><td>မှိုဆီကြော်</td><td class="price">6.00</td></tr>
+        <tr><td>ကြက်စပ်မာလာ</td><td class="price">5.00</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ORDER TAB -->
+  <div id="order" class="card hidden">
+    <h2>Order Calculator</h2>
+
+    <div class="row">
+      <div>
+        <label>Item</label>
+        <select id="item"></select>
+      </div>
+      <div>
+        <label>Quantity</label>
+        <input id="qty" type="number" min="1" value="1"/>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="line"><span>Unit Price</span><span id="unitPrice">SGD 0.00</span></div>
+      <div class="line"><span>Quantity</span><span id="qtyOut">1</span></div>
+      <div class="line"><strong>Total</strong><strong class="big" id="total">SGD 0.00</strong></div>
+    </div>
+
+    <button onclick="addItem()">Add to Order</button>
+
+    <div id="orderList" style="margin-top:12px;"></div>
+  </div>
+
+</div>
+
+<script>
+  const ITEMS = [
+    { name: "ဆိတ်သုခ", price: 9 },
+    { name: "ဆိတ်ပြားကြွပ်ကြော်", price: 8 },
+    { name: "ဆိတ်စပ်စလူး", price: 8 },
+    { name: "ဆိတ်မွှကြော်", price: 8 },
+    { name: "ဆိတ်ချောင်းကြော်", price: 7.5 },
+    { name: "ဆိတ်မာလာမွှေး", price: 5 },
+    { name: "ဆိတ်သားခြောက်ဖုတ်", price: 7 },
+    { name: "ဂျူးပဲပုပ်ကြော်", price: 4 },
+    { name: "ငရုတ်သီးနှမ်းကပ်ကြော်", price: 4 },
+    { name: "မှိုနှမ်းကပ်ကြော်", price: 4 },
+    { name: "မှိုဆီကြော်", price: 6 },
+    { name: "ကြက်စပ်မာလာ", price: 5 }
+  ];
+
+  const itemSelect = document.getElementById("item");
+  const qtyInput = document.getElementById("qty");
+  const unitPrice = document.getElementById("unitPrice");
+  const qtyOut = document.getElementById("qtyOut");
+  const totalEl = document.getElementById("total");
+  const orderList = document.getElementById("orderList");
+
+  const orderLines = [];
+
+  function fmt(n){ return "SGD " + n.toFixed(2); }
+
+  ITEMS.forEach((it, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = it.name + " — " + fmt(it.price);
+    itemSelect.appendChild(opt);
+  });
+
+  function recalc(){
+    const idx = itemSelect.value;
+    const q = Math.max(1, parseInt(qtyInput.value || 1));
+    const p = ITEMS[idx].price;
+
+    qtyInput.value = q;
+    unitPrice.textContent = fmt(p);
+    qtyOut.textContent = q;
+    totalEl.textContent = fmt(p * q);
+  }
+
+  function addItem(){
+    const idx = itemSelect.value;
+    const q = Math.max(1, parseInt(qtyInput.value || 1));
+    const item = ITEMS[idx];
+
+    orderLines.push({ name: item.name, qty: q, total: item.price * q });
+    renderOrder();
+  }
+
+  function renderOrder(){
+    if(orderLines.length === 0){
+      orderList.innerHTML = "<em>No items added.</em>";
+      return;
+    }
+    let html = "<strong>Order List:</strong><ul>";
+    let sum = 0;
+    orderLines.forEach(l=>{
+      sum += l.total;
+      html += `<li>${l.name} × ${l.qty} = ${fmt(l.total)}</li>`;
+    });
+    html += `</ul><strong>Grand Total: ${fmt(sum)}</strong>`;
+    orderList.innerHTML = html;
+  }
+
+  function showTab(tab){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.card').forEach(c=>c.classList.add('hidden'));
+
+    if(tab === 'menu'){
+      document.getElementById('menu').classList.remove('hidden');
+      document.querySelectorAll('.tab')[0].classList.add('active');
+    }else{
+      document.getElementById('order').classList.remove('hidden');
+      document.querySelectorAll('.tab')[1].classList.add('active');
+    }
+  }
+
+  itemSelect.addEventListener("change", recalc);
+  qtyInput.addEventListener("input", recalc);
+
+  recalc();
+  renderOrder();
+</script>
+</body>
+</html>
