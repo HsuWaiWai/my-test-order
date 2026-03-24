@@ -48,10 +48,22 @@
     th,td{ padding:12px 10px; border-bottom:1px solid #f0f0f6; }
     th{ text-align:left; font-size:13px; color:#444; background:#fafafe; }
     .price{ text-align:right; font-weight:700; white-space:nowrap; }
+
     .muted{ color:#666; font-size:12px; }
+    .pill{
+      display:inline-block;
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:12px;
+      background:#eef6ff;
+      border:1px solid #d8ebff;
+      color:#0b57d0;
+      vertical-align:middle;
+      margin-left:8px;
+    }
 
     label{ display:block; font-size:12px; color:#444; margin:12px 0 6px; }
-    select,input{
+    select,input,textarea{
       width:100%;
       padding:12px;
       border-radius:10px;
@@ -59,7 +71,9 @@
       font-size:16px;
       background:#fff;
       outline:none;
+      box-sizing:border-box;
     }
+    textarea{ min-height:80px; resize:vertical; }
 
     .row{ display:grid; grid-template-columns:1fr 160px; gap:12px; }
     @media(max-width:520px){ .row{ grid-template-columns:1fr; } }
@@ -84,8 +98,29 @@
       cursor:pointer;
     }
     button.primary{ border-color:#0b57d0; background:#0b57d0; color:#fff; }
+    button.danger{ border-color:#c62828; background:#c62828; color:#fff; }
 
     .hidden{ display:none; }
+
+    .box{
+      margin-top:12px;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid #ececf5;
+      background:#fafafe;
+    }
+
+    .toast{
+      margin-top:12px;
+      padding:12px;
+      border-radius:12px;
+      border:1px solid #e7e7ee;
+      background:#fff;
+    }
+
+    .right{ text-align:right; }
+    .small{ font-size:12px; }
+    code{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
   </style>
 </head>
 
@@ -96,14 +131,15 @@
   <div class="tabs">
     <div class="tab active" onclick="showTab('menu')">📋 Menu</div>
     <div class="tab" onclick="showTab('order')">🧮 Order Calculator</div>
+    <div class="tab" onclick="showTab('submit')">✅ Submit Order</div>
   </div>
 
   <!-- MENU TAB -->
   <div id="menu" class="card">
-    <h2>Item Price List (SGD)</h2>
+    <h2>Item Price List <span class="pill">SGD</span></h2>
     <div class="muted">Flavour variants included: အချို / အစပ် / မာလာ</div>
 
-    <table aria-label="Item price list">
+    <table aria-label="Item price list" style="margin-top:10px;">
       <thead>
         <tr>
           <th>Item</th>
@@ -126,7 +162,7 @@
       </div>
       <div>
         <label for="qty">Quantity</label>
-        <input id="qty" type="number" min="1" value="1"/>
+        <input id="qty" type="number" min="1" step="1" value="1"/>
       </div>
     </div>
 
@@ -137,18 +173,54 @@
     </div>
 
     <div class="btnRow">
-      <button class="primary" type="button" onclick="addItem()">Add to Order</button>
-      <button type="button" onclick="resetOrder()">Reset</button>
+      <button class="primary" type="button" onclick="addLine()">Add to Cart</button>
+      <button type="button" onclick="resetCart()">Reset Cart</button>
     </div>
 
-    <div id="orderList" style="margin-top:12px;"></div>
+    <div id="cartView" class="box"></div>
+  </div>
+
+  <!-- SUBMIT TAB -->
+  <div id="submit" class="card hidden">
+    <h2>Submit Order</h2>
+    <div class="muted">
+      This sends orders to your Google Sheet via Apps Script Web App.
+    </div>
+
+    <label for="customerName">Customer name</label>
+    <input id="customerName" placeholder="e.g. Aye Aye"/>
+
+    <label for="remarks">Remarks (optional)</label>
+    <textarea id="remarks" placeholder="e.g. less spicy, pickup time, etc."></textarea>
+
+    <div id="submitCart" class="box"></div>
+
+    <div class="btnRow">
+      <button class="primary" type="button" onclick="submitOrder()">Submit</button>
+      <button type="button" onclick="copyOrderText()">Copy order text</button>
+      <button type="button" onclick="resetCart()">Reset Cart</button>
+    </div>
+
+    <div id="submitMsg" class="toast hidden"></div>
+
+    <div class="box">
+      <div class="small muted">
+        Setup note: paste your Apps Script Web App URL into <code>GOOGLE_SCRIPT_URL</code> in the script below.
+      </div>
+    </div>
   </div>
 
 </div>
 
 <script>
+  // ============================================================
+  // 1) Paste your Google Apps Script Web App URL here:
+  // Example: https://script.google.com/macros/s/XXXXX/exec
+  // ============================================================
+  const GOOGLE_SCRIPT_URL = "PASTE_YOUR_WEB_APP_URL_HERE";
+
   // Full item list (including flavour variants)
-  onst ITEMS = [
+  const ITEMS = [
     { name: "ဆိတ်သုခ", flavour: "အချို", price: 9.5 },
     { name: "ဆိတ်သုခ", flavour: "အစပ်", price: 9.5 },
 
@@ -174,20 +246,38 @@
     { name: "ကြက်စပ်မာလာ", flavour: "-", price: 5.5 },
   ];
 
+  // Cart shared between tabs
+  // Each line: { name, flavour, label, qty, unitPrice, lineTotal }
+  const cart = [];
+
+  // DOM
   const menuBody = document.getElementById("menuBody");
   const itemSelect = document.getElementById("item");
   const qtyInput = document.getElementById("qty");
   const unitPriceEl = document.getElementById("unitPrice");
   const qtyOutEl = document.getElementById("qtyOut");
   const totalEl = document.getElementById("total");
-  const orderListEl = document.getElementById("orderList");
 
-  const orderLines = [];
+  const cartView = document.getElementById("cartView");
+  const submitCart = document.getElementById("submitCart");
+  const submitMsg = document.getElementById("submitMsg");
+
+  // Helpers
   const fmt = (n) => "SGD " + Number(n).toFixed(2);
 
   function itemLabel(it){
     const f = (it.flavour && it.flavour !== "-") ? ` (${it.flavour})` : "";
     return `${it.name}${f}`;
+  }
+
+  function clampQty(v){
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 1) return 1;
+    return Math.floor(n);
+  }
+
+  function cartTotal(){
+    return cart.reduce((sum, l) => sum + l.lineTotal, 0);
   }
 
   // Render menu table
@@ -213,12 +303,7 @@
       opt.textContent = `${itemLabel(it)} — ${fmt(it.price)}`;
       itemSelect.appendChild(opt);
     });
-  }
-
-  function clampQty(v){
-    const n = Number(v);
-    if (!Number.isFinite(n) || n < 1) return 1;
-    return Math.floor(n);
+    itemSelect.value = "0";
   }
 
   function recalc(){
@@ -232,60 +317,213 @@
     totalEl.textContent = fmt(it.price * q);
   }
 
-  function addItem(){
+  function addLine(){
     const idx = Number(itemSelect.value || 0);
     const it = ITEMS[idx];
     const q = clampQty(qtyInput.value);
-    const total = it.price * q;
 
-    orderLines.push({ label: itemLabel(it), qty: q, total });
-    renderOrder();
+    const line = {
+      name: it.name,
+      flavour: it.flavour || "-",
+      label: itemLabel(it),
+      qty: q,
+      unitPrice: it.price,
+      lineTotal: it.price * q
+    };
+    cart.push(line);
+
+    renderCart();
+    renderSubmitCart();
   }
 
-  function renderOrder(){
-    if (orderLines.length === 0) {
-      orderListEl.innerHTML = "<em>No items added.</em>";
-      return;
-    }
-    let sum = 0;
-    let html = "<strong>Order List:</strong><ul style='margin:8px 0 0; padding-left:18px;'>";
-    orderLines.forEach(l => {
-      sum += l.total;
-      html += `<li>${l.label} × ${l.qty} = ${fmt(l.total)}</li>`;
-    });
-    html += `</ul><div style="margin-top:8px;"><strong>Grand Total: ${fmt(sum)}</strong></div>`;
-    orderListEl.innerHTML = html;
+  function removeLine(index){
+    if (index < 0 || index >= cart.length) return;
+    cart.splice(index, 1);
+    renderCart();
+    renderSubmitCart();
   }
 
-  function resetOrder(){
-    orderLines.length = 0;
+  function resetCart(){
+    cart.length = 0;
     qtyInput.value = 1;
     itemSelect.value = "0";
     recalc();
-    renderOrder();
+    renderCart();
+    renderSubmitCart();
+    hideSubmitMsg();
   }
 
+  function renderCart(){
+    if (cart.length === 0) {
+      cartView.innerHTML = "<em>Cart is empty. Add items to submit later.</em>";
+      return;
+    }
+
+    let html = "<strong>Cart:</strong><ul style='margin:8px 0 0; padding-left:18px;'>";
+    cart.forEach((l, i) => {
+      html += `
+        <li>
+          ${l.label} × ${l.qty} = ${fmt(l.lineTotal)}
+          <button style="margin-left:8px; padding:4px 8px; font-size:12px;" onclick="removeLine(${i})">Remove</button>
+        </li>`;
+    });
+    html += `</ul>
+      <div class="right" style="margin-top:8px;">
+        <strong>Cart Total: ${fmt(cartTotal())}</strong>
+      </div>`;
+    cartView.innerHTML = html;
+  }
+
+  function renderSubmitCart(){
+    if (cart.length === 0) {
+      submitCart.innerHTML = "<em>Cart is empty. Go to 'Order Calculator' tab and add items.</em>";
+      return;
+    }
+
+    let html = "<strong>Order items:</strong><ul style='margin:8px 0 0; padding-left:18px;'>";
+    cart.forEach((l) => {
+      html += `<li>${l.label} × ${l.qty} = ${fmt(l.lineTotal)}</li>`;
+    });
+    html += `</ul>
+      <div class="right" style="margin-top:8px;">
+        <strong>Total: ${fmt(cartTotal())}</strong>
+      </div>`;
+    submitCart.innerHTML = html;
+  }
+
+  // Tabs
   function showTab(tab){
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById('menu').classList.add('hidden');
     document.getElementById('order').classList.add('hidden');
+    document.getElementById('submit').classList.add('hidden');
 
     if (tab === 'menu') {
       document.getElementById('menu').classList.remove('hidden');
       document.querySelectorAll('.tab')[0].classList.add('active');
-    } else {
+    } else if (tab === 'order') {
       document.getElementById('order').classList.remove('hidden');
       document.querySelectorAll('.tab')[1].classList.add('active');
+    } else {
+      document.getElementById('submit').classList.remove('hidden');
+      document.querySelectorAll('.tab')[2].classList.add('active');
+      renderSubmitCart();
     }
   }
 
+  // Submit to Google Sheets (Apps Script Web App)
+  async function submitOrder(){
+    const customerName = (document.getElementById("customerName").value || "").trim();
+    const remarks = (document.getElementById("remarks").value || "").trim();
+
+    if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) {
+      showSubmitMsg("❌ Please set GOOGLE_SCRIPT_URL in the HTML file.", false);
+      return;
+    }
+    if (!customerName) {
+      showSubmitMsg("❌ Please enter customer name.", false);
+      return;
+    }
+    if (cart.length === 0) {
+      showSubmitMsg("❌ Cart is empty. Add items first.", false);
+      return;
+    }
+
+    const total = cartTotal();
+
+    // Send only what you need. (Keep it simple for Sheets)
+    const payload = {
+      customerName,
+      remarks,
+      items: cart.map(l => ({
+        item: l.name,
+        flavour: l.flavour,
+        label: l.label,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal
+      })),
+      total,
+      userAgent: navigator.userAgent
+    };
+
+    try {
+      showSubmitMsg("Submitting...", true);
+
+      const res = await fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (data && data.ok) {
+        showSubmitMsg(`✅ Order submitted! Total: ${fmt(total)}`, true);
+
+        // Clear cart after successful submit
+        cart.length = 0;
+        renderCart();
+        renderSubmitCart();
+        document.getElementById("customerName").value = "";
+        document.getElementById("remarks").value = "";
+        recalc();
+      } else {
+        showSubmitMsg("❌ Submit failed: " + (data.error || "Unknown error"), false);
+      }
+    } catch (err) {
+      showSubmitMsg("❌ Network error: " + String(err), false);
+    }
+  }
+
+  function showSubmitMsg(msg, ok){
+    submitMsg.classList.remove("hidden");
+    submitMsg.style.borderColor = ok ? "#c8e6c9" : "#ffcdd2";
+    submitMsg.style.background = ok ? "#e8f5e9" : "#ffebee";
+    submitMsg.textContent = msg;
+  }
+
+  function hideSubmitMsg(){
+    submitMsg.classList.add("hidden");
+    submitMsg.textContent = "";
+  }
+
+  // Convenience: copy order text (for WhatsApp)
+  async function copyOrderText(){
+    if (cart.length === 0) {
+      showSubmitMsg("❌ Cart is empty.", false);
+      return;
+    }
+    const customerName = (document.getElementById("customerName").value || "").trim();
+    const total = cartTotal();
+
+    const lines = [];
+    if (customerName) lines.push(`Customer: ${customerName}`);
+    lines.push("Order:");
+    cart.forEach(l => lines.push(`- ${l.label} x${l.qty} = ${fmt(l.lineTotal)}`));
+    lines.push(`Total: ${fmt(total)}`);
+
+    const text = lines.join("\n");
+
+    try {
+      await navigator.clipboard.writeText(text);
+      showSubmitMsg("✅ Copied order text to clipboard.", true);
+    } catch (e) {
+      // Fallback
+      showSubmitMsg("❌ Could not copy automatically. Select & copy manually:\n" + text, false);
+    }
+  }
+
+  // Events
   itemSelect.addEventListener("change", recalc);
   qtyInput.addEventListener("input", recalc);
 
-  // init
+  // Init
   renderMenu();
   fillDropdown();
-  resetOrder();
+  recalc();
+  renderCart();
+  renderSubmitCart();
 </script>
 </body>
 </html>
