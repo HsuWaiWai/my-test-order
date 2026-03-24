@@ -184,7 +184,7 @@
   <div id="submit" class="card hidden">
     <h2>Submit Order</h2>
     <div class="muted">
-      This sends orders to your Google Sheet via Apps Script Web App.
+      You can save orders to Google Sheets or download them as a CSV file for Excel.
     </div>
 
     <label for="customerName">Customer name</label>
@@ -196,7 +196,8 @@
     <div id="submitCart" class="box"></div>
 
     <div class="btnRow">
-      <button class="primary" type="button" onclick="submitOrder()">Submit</button>
+      <button class="primary" type="button" onclick="submitOrder()">Submit to Google Sheet</button>
+      <button type="button" onclick="downloadOrderCsv()">Download CSV for Excel</button>
       <button type="button" onclick="copyOrderText()">Copy order text</button>
       <button type="button" onclick="resetCart()">Reset Cart</button>
     </div>
@@ -205,7 +206,7 @@
 
     <div class="box">
       <div class="small muted">
-        Setup note: paste your Apps Script Web App URL into <code>GOOGLE_SCRIPT_URL</code> in the script below.
+        Setup note: paste your Apps Script Web App URL into <code>GOOGLE_SCRIPT_URL</code> below for Google Sheets. If you do not set it, you can still download the order as CSV and open it in Excel.
       </div>
     </div>
   </div>
@@ -411,6 +412,85 @@
     }
   }
 
+
+  // Build order payload used by Google Sheets and CSV export
+  function buildOrderPayload(){
+    const customerName = (document.getElementById("customerName").value || "").trim();
+    const remarks = (document.getElementById("remarks").value || "").trim();
+    const total = cartTotal();
+
+    return {
+      orderId: "ORD-" + Date.now(),
+      submittedAt: new Date().toISOString(),
+      customerName,
+      remarks,
+      items: cart.map(l => ({
+        item: l.name,
+        flavour: l.flavour,
+        label: l.label,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal
+      })),
+      total,
+      userAgent: navigator.userAgent
+    };
+  }
+
+  function escapeCsv(value){
+    const s = String(value ?? "");
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function downloadTextFile(filename, content, mimeType){
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadOrderCsv(){
+    const customerName = (document.getElementById("customerName").value || "").trim();
+
+    if (!customerName) {
+      showSubmitMsg("❌ Please enter customer name before downloading CSV.", false);
+      return;
+    }
+    if (cart.length === 0) {
+      showSubmitMsg("❌ Cart is empty. Add items first.", false);
+      return;
+    }
+
+    const payload = buildOrderPayload();
+    const rows = [["Order ID","Submitted At","Customer Name","Remarks","Item","Flavour","Label","Qty","Unit Price","Line Total","Order Total"]];
+
+    payload.items.forEach((l, idx) => {
+      rows.push([
+        payload.orderId,
+        payload.submittedAt,
+        payload.customerName,
+        idx === 0 ? payload.remarks : "",
+        l.item,
+        l.flavour,
+        l.label,
+        l.qty,
+        l.unitPrice,
+        l.lineTotal,
+        idx === 0 ? payload.total : ""
+      ]);
+    });
+
+    const csv = "\uFEFF" + rows.map(r => r.map(escapeCsv).join(",")).join("\r\n");
+    const safeName = customerName.replace(/[^a-z0-9-_]+/gi, "_").replace(/^_+|_+$/g, "") || "order";
+    downloadTextFile(`${safeName}_${payload.orderId}.csv`, csv, "text/csv;charset=utf-8;");
+    showSubmitMsg("✅ CSV downloaded with UTF-8 encoding for Excel.", true);
+  }
+
   // Submit to Google Sheets (Apps Script Web App)
   async function submitOrder(){
     const customerName = (document.getElementById("customerName").value || "").trim();
@@ -429,23 +509,8 @@
       return;
     }
 
-    const total = cartTotal();
-
-    // Send only what you need. (Keep it simple for Sheets)
-    const payload = {
-      customerName,
-      remarks,
-      items: cart.map(l => ({
-        item: l.name,
-        flavour: l.flavour,
-        label: l.label,
-        qty: l.qty,
-        unitPrice: l.unitPrice,
-        lineTotal: l.lineTotal
-      })),
-      total,
-      userAgent: navigator.userAgent
-    };
+    const payload = buildOrderPayload();
+    const total = payload.total;
 
     try {
       showSubmitMsg("Submitting...", true);
@@ -494,13 +559,29 @@
       showSubmitMsg("❌ Cart is empty.", false);
       return;
     }
+
     const customerName = (document.getElementById("customerName").value || "").trim();
+    const remarks = (document.getElementById("remarks").value || "").trim();
     const total = cartTotal();
 
-    const lines = [];
+    const lines = [
+      "🧾 ORDER SUMMARY",
+      "================"
+    ];
+
     if (customerName) lines.push(`Customer: ${customerName}`);
-    lines.push("Order:");
-    cart.forEach(l => lines.push(`- ${l.label} x${l.qty} = ${fmt(l.lineTotal)}`));
+    if (remarks) lines.push(`Remarks: ${remarks}`);
+
+    lines.push("");
+    lines.push("Items:");
+
+    cart.forEach((l, idx) => {
+      lines.push(`${idx + 1}. ${l.label}`);
+      lines.push(`   Qty: ${l.qty} × ${fmt(l.unitPrice)} = ${fmt(l.lineTotal)}`);
+    });
+
+    lines.push("");
+    lines.push("----------------");
     lines.push(`Total: ${fmt(total)}`);
 
     const text = lines.join("\n");
@@ -509,8 +590,7 @@
       await navigator.clipboard.writeText(text);
       showSubmitMsg("✅ Copied order text to clipboard.", true);
     } catch (e) {
-      // Fallback
-      showSubmitMsg("❌ Could not copy automatically. Select & copy manually:\n" + text, false);
+      showSubmitMsg("❌ Could not copy automatically. Please copy manually:\n\n" + text, false);
     }
   }
 
